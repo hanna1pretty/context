@@ -137,6 +137,25 @@ class ContextDevClient:
             idempotency_key=idempotency_key)
         return normalize_generic("scrape", payload)
 
+    async def scrape_screenshot(self, url: str, *, idempotency_key=None,
+                                screenshot_params=None):
+        """Scrape with a screenshot (VERIFIED).
+
+        POST /web/scrape, body formats {"screenshot": True, "markdown": True}.
+        Markdown is requested alongside the screenshot so the photo
+        caption can show title / final URL / credits / request_id and a
+        failed screenshot still leaves a text fallback (isPartial is
+        surfaced honestly by the normalizer). screenshotParams, when
+        given, is only meaningful with formats.screenshot: true, so it
+        is only sent here. Older GET /web/scrape/screenshot is
+        equivalent to formats.screenshot: true.
+        """
+        body: dict = {"url": url, "formats": {"screenshot": True, "markdown": True}}
+        if screenshot_params is not None:
+            body["screenshotParams"] = screenshot_params
+        payload, _ = await self.request("scrape", body, idempotency_key=idempotency_key)
+        return normalize_generic("scrape", payload)
+
     async def search(self, query: str, **kwargs):
         payload, _ = await self.request("search", {"query": query, **kwargs})
         return normalize_generic("search", payload)
