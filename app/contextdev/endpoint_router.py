@@ -29,7 +29,13 @@ class Endpoint:
 
 ENDPOINTS: dict[str, Endpoint] = {
     "scrape": Endpoint("scrape", "POST", "/web/scrape", VERIFIED, 1,
-                       "Body {url, formats:{markdown:true}}; verified response shape."),
+                       "Body {url, formats:{markdown:true}}; verified response shape. "
+                       "Screenshot VERIFIED: formats:{screenshot:true} (+ optional "
+                       "screenshotParams) -> screenshot {requested, success, data} "
+                       "with data as a base64 image data URL; older GET "
+                       "/web/scrape/screenshot is equivalent. Standard scrape "
+                       "is 1 credit; credits_consumed from key_metadata is "
+                       "authoritative, no screenshot surcharge is hardcoded."),
     "crawl": Endpoint("crawl", "POST", "/web/crawl", VERIFIED, 1,
                       "1 credit/page, up to 500 pages in one call; larger -> batches."),
     "search": Endpoint("search", "POST", "/web/search", PATTERN_INFERRED, 1, ""),
