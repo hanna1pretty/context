@@ -27,6 +27,13 @@ class ScrapeResult:
     credits: CreditInfo = field(default_factory=CreditInfo)
     is_partial: bool = False
     formats: dict = field(default_factory=dict)
+    # Screenshot (VERIFIED, docs.context.dev/api-reference/web-scraping/scrape):
+    # formats.screenshot: true -> payload["screenshot"] = {requested, success,
+    # data} where data is a base64 image data URL. Only ever set when
+    # success is True AND data is a valid "data:image/..." string; see
+    # result_normalizer._screenshot().
+    screenshot_data_url: str | None = None
+    screenshot_success: bool | None = None
 
 
 @dataclass
@@ -49,6 +56,10 @@ class NormalizedResult:
     credits: CreditInfo = field(default_factory=CreditInfo)
     is_partial: bool = False
     raw_keys: list[str] = field(default_factory=list)
+    # Screenshot, same contract as ScrapeResult above. Never log this
+    # value: a full-page screenshot data URL can be several MB.
+    screenshot_data_url: str | None = None
+    screenshot_success: bool | None = None
 
 
 @dataclass
