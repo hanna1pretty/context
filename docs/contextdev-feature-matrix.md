@@ -9,6 +9,7 @@ so they are marked PATTERN-INFERRED and the client degrades gracefully on
 | Feature | Endpoint (base https://api.context.dev/v1) | Status | Min credits (anchor) |
 |---|---|---|---|
 | Scrape | POST /web/scrape, body {url, formats:{markdown:true}}, header Authorization: Bearer <API_KEY>; response markdown.data, metadata.title, request_id, key_metadata.credits_consumed, per-format {requested,success,data}, isPartial | VERIFIED | 1 |
+| Scrape — Screenshot | POST /web/scrape, body {url, formats:{screenshot:true, markdown:true}, screenshotParams? (optional, only with formats.screenshot:true)}; response screenshot {requested, success, data} where data is a base64 image data URL; older GET /web/scrape/screenshot is equivalent to formats.screenshot:true. Normalizer only accepts screenshot when success==true and data starts with "data:image/"; otherwise it reports success=false/None, never a fake success. Delivery: Telegram photo via services/screenshot_delivery.py (png/jpeg/webp only, max 10 MB decoded), with markdown text fallback when the screenshot is missing/failed/oversized. | VERIFIED | 1 (standard scrape credit; key_metadata.credits_consumed is authoritative — no screenshot surcharge is hardcoded) |
 | Crawl | POST /web/crawl; follows links, up to 500 pages Markdown in one call, page/depth/path/time limits; larger sites use Batches in crawl mode | VERIFIED | 1/page |
 | Search | POST /web/search | PATTERN-INFERRED | from 1 |
 | Map | POST /web/map | PATTERN-INFERRED | from 1 |
