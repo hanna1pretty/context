@@ -136,6 +136,149 @@ validators,rate_limit}. Core pure modules (security, contextdev retry/
 normalizer/errors, services entitlement) have NO third-party imports so
 pytest runs without aiogram/FastAPI/SQLAlchemy installed.
 
+## Inline keyboard system (premium, spec sections 1-25)
+
+All navigation is inline keyboards, Telegram HTML, v1-namespaced
+callbacks. No button is dead: every callback in every keyboard is
+recognised by `app/bot/callbacks/base.py::validate_callback` (tested in
+`tests/test_inline_keyboards.py`).
+
+### Menu diagram (text)
+
+```text
+Menu Utama
+├── Scrape URL ── Konfirmasi Scrape ── Job Center
+├── Search Web ── Hasil Pencarian (per-hasil Buka/Baca, pagination)
+├── Crawl Website ── Konfirmasi Crawl ── Job Center
+├── Map URLs ── Hasil Map (export gated by entitlement)
+├── Ask / Answers ── Hasil Jawaban (sumber, export, simpan)
+├── Parse File ── Hasil Parse (nama/ukuran/MIME, tanpa path server)
+├── Brand Intel ── Brand / Styleguide / People / Company
+├── News ── Hasil Berita (Buka/Baca, pagination)
+├── Batches ── Job Center (aktif/selesai/gagal/semua)
+├── Monitors ── Monitor Saya / Perubahan / Hapus (2 langkah)
+├── Usage & Paket ── Detail Usage / Paket / Upgrade (checkout only)
+├── Pengaturan ── Bahasa / Timezone / Notifikasi / Output /
+│                 Clear History (2 langkah) / Hapus Data (2 langkah)
+├── Bantuan ── Command / Contoh / Status / Privacy
+└── Menu Admin (admin only) ── Set/Lihat/Hapus API Key (legacy) + Dashboard
+```
+
+Every submenu ends with `‹ Kembali` + `Menu Utama`. Back uses a
+bounded stack (max 10, 1-hour expiry) with fallback to home.
+
+### Screens (all in handlers/navigation.py SCREENS)
+
+home, scrape, scrape_confirm, search, search_results, crawl,
+crawl_confirm, map, map_results, answers, answers_result, parse,
+parse_result, intelligence, brand, styleguide, people, company, news,
+news_results, batches, job_center, job_detail, monitors, monitor_detail,
+monitor_delete_confirm, usage, plan, settings, settings_delete_confirm,
+settings_clear_confirm, help, help_commands, help_examples, help_status,
+help_privacy, admin, admin_dashboard.
+
+### Callback namespaces (all `v1`, all under 64 bytes)
+
+| Namespace | Purpose | Examples |
+|---|---|---|
+| nav | navigation | `nav:v1:home`, `nav:v1:back`, `nav:v1:screen:scrape` |
+| scrape | scrape modes/confirm | `scrape:v1:mode:markdown`, `scrape:v1:confirm` |
+| search | search filters/pages/results by INDEX | `search:v1:page:2`, `search:v1:open:3` |
+| crawl | crawl params/confirm | `crawl:v1:param:depth`, `crawl:v1:confirm` |
+| map | map filters/export/pages | `map:v1:export:json`, `map:v1:page:2` |
+| answers | answer styles/sources | `answers:v1:style:detail`, `answers:v1:source` |
+| parse | parse upload/output | `parse:v1:output:markdown`, `parse:v1:view` |
+| intelligence | brand/styleguide/people/company | `intelligence:v1:people:search` |
+| news | news filters/pages/results by INDEX | `news:v1:page:2`, `news:v1:read:1` |
+| job | Job Center actions by short id | `job:v1:status:abc123`, `job:v1:retry:abc123` |
+| batch | batch actions by short id | `batch:v1:new`, `batch:v1:status:b9` |
+| monitor | monitor actions by short id | `monitor:v1:pause:mon1`, `monitor:v1:confirm_delete:mon1` |
+| plan | plan/upgrade (checkout only, never auto-charge) | `plan:v1:show`, `plan:v1:upgrade:pro` |
+| settings | settings + 2-step destructive actions | `settings:v1:language`, `settings:v1:confirm_delete` |
+| admin | NEW admin buttons | `admin:v1:dashboard` |
+| admin (legacy) | pre-v1 admin key flow, retained | `admin:set_api_key`, `admin:api_key_status`, `admin:delete_api_key`, `admin:cancel_api_key` |
+
+Rules: job/monitor/batch callbacks carry short server-side IDs only
+(never raw URLs or long cursors — long cursors live in
+`callbacks/base.py::CursorStore` with TTL). Callback handlers answer
+first, check user + ownership + entitlement (`check_feature`; locked
+routes to the plan screen and never enqueues), handle expiry, guard
+double-clicks with `DoubleClickGuard`, and never call Context.dev
+directly — they enqueue via `workers.queue.enqueue_job` only.
+
+### How to add a new button / submenu without breaking navigation
+
+1. Add the callback builder in the matching `app/bot/callbacks/*.py`
+   (or a new namespace entry in `callbacks/base.py::_NAMESPACE_ACTIONS`
+   if it is a genuinely new namespace) — builders raise on overlong data.
+2. Add the keyboard factory in the matching `app/bot/keyboards/*.py`,
+   ending the rows with `with_back_home(...)` (or `back_home_row()`).
+3. Add the screen id to `callbacks/navigation.py::SCREEN_IDS` (and
+   `PARENT_SCREEN` if it has a non-home parent) and one entry in
+   `handlers/navigation.py::SCREENS` (text fn + keyboard fn).
+4. If the button starts a job, add it to
+   `handlers/feature_callbacks.py::_ENQUEUE_ACTIONS` so it gets the
+   double-click guard; if it needs a plan gate, add it to
+   `_FEATURE_FOR_ACTION`. Never add a network call in a callback handler.
+5. Run `python -m pytest -q` — the "every callback recognised" and
+   "every nav target exists" tests fail loudly on dead buttons.
+
+### Text examples (from formatters/messages.py)
+
+Main menu (ID):
+```html
+<b>Context Intelligence Bot</b>
+
+<blockquote>Web intelligence cepat untuk membaca, mencari, mengekstrak,
+dan memantau informasi dari internet.</blockquote>
+
+<b>Pilih fitur:</b>
+Pilih salah satu menu di bawah atau kirim URL dan pertanyaan langsung.
+```
+
+Scrape confirmation:
+```html
+<b>Konfirmasi Scrape</b>
+
+<b>URL:</b> <code>https://example.com/...</code>
+<b>Mode:</b> <code>Markdown</code>
+<b>Cache:</b> <code>Default</code>
+
+Apakah permintaan ini sudah benar?
+```
+
+Search results: title + `<blockquote>` snippet + `domain · date` per
+result, with `[N Buka] [N Baca]` buttons and `[‹ Prev] [1 / 5] [Next ›]`
+pagination (the `1 / 5` indicator re-requests the current page — it is
+a refresh, never a dead button).
+
+Job Center:
+```html
+<b>Job Center</b>
+
+Di sini kamu dapat melihat pekerjaan aktif, selesai, gagal, atau kadaluarsa.
+```
+Per job: `<b>Job:</b> <code>abc123</code>` + real stored type/status/
+created (never fabricated progress), with Status/Hasil/Batalkan/
+Coba Lagi/Hapus/Refresh.
+
+Usage:
+```html
+<b>Usage & Paket</b>
+
+<b>Paket:</b> <code>PRO</code>
+<b>Penggunaan hari ini:</b> <code>24 / 100</code>
+<b>Job aktif:</b> <code>1</code>
+<b>Reset limit:</b> <code>besok 00:00</code>
+```
+
+Error states (each with its own buttons): validation → Coba Lagi/
+Kembali; rate limit → Refresh Status/Job Saya; quota → Lihat Usage/
+Lihat Paket; Context.dev error → safe internal code only (e.g.
+`ERR_1`, never a stack trace) + Coba Lagi.
+
+No new environment variables were added for this system.
+
 ## Troubleshooting
 - "Missing required secret(s)": set the named env vars; values are never printed.
 - 429s: the client honours Retry-After with bounded exponential backoff +
