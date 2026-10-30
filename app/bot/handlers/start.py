@@ -1,6 +1,8 @@
 """ /start, /help, /language, /cancel, bare-URL conversational flow, /delete_my_data."""
 from __future__ import annotations
 
+import os
+
 from .._compat import get_router
 from ..formatters import welcome
 from ..keyboards import main_menu, url_choices
@@ -20,9 +22,17 @@ except Exception:  # pragma: no cover
     _Message = object  # type: ignore
 
 
+def _is_admin(uid: int) -> bool:
+    return str(uid) in {p.strip() for p in os.environ.get("ADMIN_TELEGRAM_IDS", "").split(",")
+                        if p.strip()}
+
+
 @router.message(_START)
 async def cmd_start(message):
-    await message.answer(welcome("id"), reply_markup=main_menu())
+    # main_menu(is_admin=...) shows the admin button only for admins;
+    # hiding alone never authorises (admin actions re-check server-side).
+    await message.answer(welcome("id"),
+                         reply_markup=main_menu(is_admin=_is_admin(message.from_user.id)))
 
 
 @router.message(_HELP)
