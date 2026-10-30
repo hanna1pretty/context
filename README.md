@@ -98,6 +98,54 @@ TELEGRAM_API_ID / TELEGRAM_API_HASH are NOT needed for Bot API bots.
   minimal formats by default. Large crawl/batch/monitor operations require
   Pro/Business entitlement and are queued, never run in handlers.
 
+## Screenshot mode (VERIFIED, Context.dev)
+
+From the menu: Scrape URL > Screenshot. The bot requests
+`POST /web/scrape` with `formats: {"screenshot": true, "markdown": true}`
+(markdown alongside, so the photo caption can show title / final URL /
+credits / request_id and a failed screenshot still leaves text).
+The older `GET /web/scrape/screenshot` route is equivalent to
+`formats.screenshot: true`; optional `screenshotParams` is only sent
+with `formats.screenshot: true` (see `client.scrape_screenshot`).
+
+What is delivered: a Telegram photo (PNG, JPEG, or WebP only, max
+10 MB decoded — `app/contextdev/screenshot.py::parse_data_url`),
+captioned with the escaped title, URL, credits consumed (from
+`key_metadata.credits_consumed`, authoritative — a standard scrape
+is 1 credit and no screenshot surcharge is hardcoded), and request
+ID. The caption never contains the raw data URL, and data URLs/bytes
+are never logged.
+
+If the screenshot is missing, failed, corrupt, non-image, or over
+10 MB, the bot sends fallback text explaining why, plus the markdown
+text when available, instead of claiming a screenshot succeeded.
+`isPartial` is always surfaced honestly.
+
+Flow in code: `contextdev/result_normalizer.py` extracts
+`screenshot_data_url` / `screenshot_success` (only on success==true
+with a `data:image/...` value) -> `workers/jobs.py` returns
+`screenshot_success`, `screenshot_data_url_present` (safe bool for
+logs/queues) and `screenshot_data_url` for the delivery helper ->
+`services/screenshot_delivery.py::prepare_screenshot_message` returns
+a photo dict or a fallback-text dict. Mode mapping lives in
+`contextdev/formats.py::scrape_mode_to_formats` (re-exported from
+`app/bot/callbacks/scrape.py`); `/scrape` uses it via
+`handlers/scrape.py::scrape_job_payload`.
+
+Remaining gaps, stated honestly (see DECISIONS.md): (1) the menu
+confirm flow (`handlers/feature_callbacks.py`) still enqueues only
+`{"callback": data}` and cannot yet recover the URL/mode from FSM
+state, so a menu Screenshot press reaches the confirm screen but
+the confirm handler does not yet turn that stored mode into a
+worker payload — use `/scrape` plus the worker/client path, or wire
+FSM state into the confirm handler (it should call
+`scrape_job_payload(url, mode)`); (2) production `main.py` photo
+delivery is not yet wired: the delivery helper returns a photo dict
+but no aiogram `send_photo` call exists in `main.py` yet, and (3)
+production ARQ results should prefer passing screenshots via
+temporary storage rather than as multi-MB job-result payloads (the
+worker dict currently carries the data URL for single-process dev).
+
 ## Remaining wiring gap (admin-panel key, honest)
 The resolver and the client acceptance are implemented and tested:
 `services/admin_key_service.py` resolves stored-key -> env, the
@@ -129,9 +177,9 @@ deployment of that migration) is ready.
 app/config.py, app/logging.py, app/main.py, app/bot/{router,middlewares,
 keyboards,formatters,handlers/*}, app/api/{health,context_webhooks,
 admin_api}, app/contextdev/{client,models,endpoint_router,errors,retry,
-result_normalizer}, app/workers/{queue,jobs,scheduler}, app/db/{models,
+result_normalizer,formats,screenshot}, app/workers/{queue,jobs,scheduler}, app/db/{models,
 repositories,migrations/001_initial.py}, app/services/{usage,subscription,admin_key_service,
-credit,job,notification,storage,moderation}, app/security/{secrets,
+credit,job,notification,storage,moderation,screenshot_delivery}, app/security/{secrets,
 validators,rate_limit}. Core pure modules (security, contextdev retry/
 normalizer/errors, services entitlement) have NO third-party imports so
 pytest runs without aiogram/FastAPI/SQLAlchemy installed.
