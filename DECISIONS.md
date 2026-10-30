@@ -86,3 +86,43 @@
 - **No new env vars for the keyboard system**: none were needed; the
   existing DEFAULT_LANGUAGE / MAX_TELEGRAM_MESSAGE_LENGTH settings
   already cover language and the 3900-char split limit.
+- **Screenshot = formats.screenshot + markdown together (VERIFIED)**:
+  POST /web/scrape with `formats: {"screenshot": true, "markdown": true}`
+  (docs.context.dev/api-reference/web-scraping/scrape; older GET
+  /web/scrape/screenshot is equivalent). Markdown is requested
+  alongside so the photo caption has title/final URL/credits/
+  request_id and a failed screenshot still leaves text, with
+  isPartial surfaced honestly. A standard scrape is 1 credit and
+  `key_metadata.credits_consumed` is authoritative — no screenshot
+  surcharge is hardcoded anywhere.
+- **Screenshot data-URL rules (strict, pure stdlib)**:
+  `contextdev/screenshot.py::parse_data_url` accepts only
+  image/png, image/jpeg, image/webp, valid base64 (validate=True),
+  and at most 10,000,000 decoded bytes (the Telegram photo limit);
+  anything else raises, and the normalizer only reports success
+  when success==true AND data starts with "data:image/...".
+  Never log a data URL or its bytes.
+- **Delivery helper vs ARQ result caveat**: the worker result dict
+  carries `screenshot_data_url` so the single-process delivery
+  helper (`services/screenshot_delivery.py`) can build the Telegram
+  photo, plus the log-safe `screenshot_data_url_present` bool.
+  A full-page screenshot data URL can be several MB, so production
+  ARQ results should prefer temporary storage (signed temp URL /
+  object store) over a routine multi-MB payload — documented in
+  README, not yet implemented.
+- **Menu confirm-flow gap (honest, not papered over)**:
+  `handlers/feature_callbacks.py::process_callback` for
+  scrape/crawl confirm still enqueues only `{"callback": data}`;
+  it has no FSM store to recover the URL/mode the user picked on
+  the Scrape menu, so the Screenshot button reaches the confirm
+  screen but confirm cannot yet turn that mode into a worker
+  payload. The mapping (`contextdev/formats.py`, re-exported from
+  `callbacks/scrape.py`), the `/scrape` wiring
+  (`handlers/scrape.py::scrape_job_payload`), the client
+  (`scrape_screenshot`), the worker (mode->formats translation +
+  screenshot fields), and the delivery helper are all implemented
+  and tested; the remaining step is passing FSM URL/mode into the
+  confirm handler and calling `scrape_job_payload(url, mode)`.
+  Likewise, `main.py` has no aiogram `send_photo` call yet, so the
+  delivery helper's photo dict is not yet consumed by production
+  Telegram code (live Telegram was not tested in this VM anyway).
