@@ -14,6 +14,39 @@ def _credits(payload: dict) -> CreditInfo:
     return CreditInfo(consumed=consumed if isinstance(consumed, int) else None)
 
 
+def _screenshot(payload: dict) -> tuple[str | None, bool | None]:
+    """Extract a screenshot from a scrape payload, honestly.
+
+    Verified shape: payload["screenshot"] = {requested, success, data}
+    where data is a base64 image data URL. Returns (data_url, success):
+    - success True + a non-empty "data:image/..." data URL -> (data, True)
+    - success False -> (None, False): never claim success on failure
+    - success True but data missing/invalid -> (None, False): the
+      screenshot is unusable, so success must not be reported as True
+    - no screenshot dict, or success missing/None -> (None, None):
+      not requested / unknown, not a failure
+    A "formats" nested screenshot dict is accepted only as a fallback
+    when the top-level "screenshot" key is absent, with the same rules.
+    The returned data URL is never logged by this module.
+    """
+    shot = payload.get("screenshot")
+    if shot is None:
+        formats = payload.get("formats")
+        if isinstance(formats, dict):
+            shot = formats.get("screenshot")
+    if not isinstance(shot, dict):
+        return None, None
+    success = shot.get("success")
+    if success is False:
+        return None, False
+    if success is True:
+        data = shot.get("data")
+        if isinstance(data, str) and data.strip() and data.startswith("data:image/"):
+            return data, True
+        return None, False
+    return None, None
+
+
 def _first_text(*values):
     for v in values:
         if isinstance(v, str) and v.strip():
@@ -29,6 +62,7 @@ def normalize_scrape(payload: dict) -> NormalizedResult:
         text = md.get("data")
     elif isinstance(md, str):
         text = md
+    shot_data, shot_success = _screenshot(payload)
     result = NormalizedResult(
         kind="scrape",
         title=meta.get("title"),
@@ -37,6 +71,8 @@ def normalize_scrape(payload: dict) -> NormalizedResult:
         credits=_credits(payload),
         is_partial=bool(payload.get("isPartial", False)),
         raw_keys=sorted(payload.keys()),
+        screenshot_data_url=shot_data,
+        screenshot_success=shot_success,
     )
     if payload.get("url"):
         result.sources = [payload["url"]]
@@ -51,6 +87,8 @@ def normalize_scrape_typed(payload: dict) -> ScrapeResult:
         html=(payload.get("html") or {}).get("data") if isinstance(payload.get("html"), dict) else None,
         title=n.title, request_id=n.request_id, credits=n.credits,
         is_partial=n.is_partial, formats=formats if isinstance(formats, dict) else {},
+        screenshot_data_url=n.screenshot_data_url,
+        screenshot_success=n.screenshot_success,
     )
 
 
