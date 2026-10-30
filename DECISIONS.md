@@ -51,3 +51,38 @@
 - **Docs over spec on conflict**: where the spec and verified Context.dev
   facts conflict, verified facts win and this file records the change.
   No such conflict was found beyond the inferred-endpoint caveat above.
+- **keyboards.py / formatters.py -> packages (inline-keyboard build)**:
+  the single files could not coexist with the spec's keyboards/ and
+  formatters/ directories, so their content moved into
+  keyboards/__init__.py and formatters/__init__.py and the old files
+  were deleted locally (REPLACED-BY-DIRECTORY — delete them on GitHub
+  too, or the package will be shadowed). Legacy imports
+  (main_menu/url_choices/admin_menu/admin_cancel_keyboard/job_actions,
+  welcome/format_search_results/format_normalized) keep working via
+  re-exports, with identical behaviour for the three formatter functions.
+- **Legacy admin callbacks retained (deliberate deviation)**: the new
+  system is fully v1-namespaced, EXCEPT admin:set_api_key,
+  admin:api_key_status, admin:delete_api_key, admin:cancel_api_key,
+  which handlers/admin.py is wired to. They stay reachable from the new
+  admin menu; all NEW admin buttons use admin:v1:*. The old url:* and
+  job:* callbacks were NOT retained because no handler consumed them —
+  url_choices() and job_actions() now emit v1 callbacks.
+- **In-memory lock/cursor, Redis documented for production**: the spec
+  asks for Redis locks and Redis/Postgres cursors, but the test suite
+  runs without Redis/Postgres, so DoubleClickGuard and CursorStore are
+  in-memory with TTL and the exact Redis contract is documented on each
+  class (SET NX EX / SET EX). Do not run multi-worker prod on them.
+- **Fallback keyboard shape is row-preserving**: the old keyboards.py
+  fallback flattened buttons into one list; the new common._mk keeps
+  rows (list of row lists) so 2-column layout is testable without aiogram.
+- **News callbacks live in callbacks/search.py**: the spec's callbacks/
+  file list has no news.py, so news builders share the search module
+  (same result-index model); keyboards/news buttons live in
+  keyboards/search.py for the same reason.
+- **Pagination indicator is a refresh, not a dead button**: the middle
+  "1 / 5" button re-requests the current page (a recognised, harmless
+  handler), because a button with no handler would violate the
+  no-dead-buttons rule.
+- **No new env vars for the keyboard system**: none were needed; the
+  existing DEFAULT_LANGUAGE / MAX_TELEGRAM_MESSAGE_LENGTH settings
+  already cover language and the 3900-char split limit.
