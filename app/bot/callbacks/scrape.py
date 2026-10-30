@@ -1,7 +1,12 @@
 """Scrape callbacks (v1). Modes match the spec section 6 menu."""
 from __future__ import annotations
 
+from ...contextdev.formats import SCRAPE_MODE_FORMATS, scrape_mode_to_formats
 from .base import build
+
+__all__ = ["MODES", "SCRAPE_MODE_FORMATS", "scrape_mode_to_formats",
+           "scrape_start", "scrape_mode", "scrape_confirm", "scrape_cancel",
+           "scrape_options", "scrape_help", "scrape_browser_actions"]
 
 MODES = ("markdown", "html", "screenshot", "json", "highlights", "fresh")
 
