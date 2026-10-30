@@ -14,6 +14,7 @@ import inspect
 
 from ..contextdev.client import API_KEY_MISSING_MESSAGE, ContextDevClient
 from ..contextdev.errors import ContextDevError, ErrorKind
+from ..contextdev.formats import scrape_mode_to_formats
 from ..security.validators import validate_url
 from ..services.credit_service import cost_guard_ok, estimate_credits
 from ..services.subscription_service import check_daily_quota, check_feature, plan_limits
@@ -82,13 +83,31 @@ async def run_job(ctx: dict, *, kind: str, user_id: int, payload: dict,
                 "estimated_credits": estimate_credits("scrape") if kind == "scrape" else 0}
     method = getattr(client, method_name)
     if kind in ("scrape", "crawl", "map"):
-        result = await method(payload["url"], **{k: v for k, v in payload.items() if k != "url"})
+        kwargs = {k: v for k, v in payload.items() if k != "url"}
+        if kind == "scrape" and "formats" not in kwargs and "mode" in kwargs:
+            # Future FSM confirm path may enqueue {"mode": "screenshot"}
+            # instead of explicit formats; translate it here and drop
+            # the mode key (the client has no `mode` parameter).
+            kwargs["formats"] = scrape_mode_to_formats(kwargs.pop("mode"))
+        result = await method(payload["url"], **kwargs)
     else:
         result = await method(payload.get("query") or payload.get("url") or "", **{})
+    shot_url = getattr(result, "screenshot_data_url", None)
     return {"kind": kind, "title": result.title, "text": (result.text or "")[:4000],
             "items": result.items, "sources": result.sources,
             "is_partial": result.is_partial, "request_id": result.request_id,
-            "credits_consumed": (result.credits.consumed if result.credits else None)}
+            "credits_consumed": (result.credits.consumed if result.credits else None),
+            # Screenshot fields. screenshot_data_url_present is the
+            # safe bool for logs/queues; screenshot_data_url itself is
+            # carried here ONLY so the delivery helper in the same
+            # process can build the Telegram photo. Size caveat: a
+            # full-page screenshot data URL can be several MB, so
+            # production ARQ results should prefer passing it via
+            # temporary storage, not as a routine job-result payload
+            # (see services/screenshot_delivery.py + DECISIONS.md).
+            "screenshot_success": getattr(result, "screenshot_success", None),
+            "screenshot_data_url_present": bool(shot_url),
+            "screenshot_data_url": shot_url}
 
 
 async def run_job_with_timeout(*args, timeout: float = 120.0, **kwargs):
