@@ -70,6 +70,12 @@ docker compose up --build
 /admin /delete_my_data — plus bare-URL conversational flow (Scrape Markdown,
 Scrape HTML, Screenshot, Extract JSON, Crawl, Map, Ask about URL).
 
+Commands are shortcuts; the primary UI is inline buttons. /help sends
+the premium inline Bantuan screen (not a raw command dump); the full
+command list is still reachable from that screen's "Semua Command"
+button. /start sends the premium welcome (see below) with the main
+menu keyboard.
+
 ## Environment variables
 See `.env.example` (placeholders only). Required in production:
 TELEGRAM_BOT_TOKEN. CONTEXT_DEV_API_KEY is now OPTIONAL -- it is only
@@ -87,6 +93,9 @@ CONTEXT_DEV_BASE_URL, CONTEXT_DEV_TIMEOUT_SECONDS (60),
 CONTEXT_DEV_MAX_CONCURRENCY (set from your Context.dev plan: Free 2,
 Developer 10, Pro 100, Growth 250, Scale 500 — do not assume 100).
 TELEGRAM_API_ID / TELEGRAM_API_HASH are NOT needed for Bot API bots.
+BOT_DISPLAY_NAME (default "OktaScrape") is the name used inside bot
+messages (welcome, help). It is NOT the Telegram BotFather display
+name — change that name in BotFather, not in code or .env.
 
 ## Cost / credit controls
 - Estimates use the pricing anchors in docs/contextdev-feature-matrix.md
@@ -139,12 +148,81 @@ state, so a menu Screenshot press reaches the confirm screen but
 the confirm handler does not yet turn that stored mode into a
 worker payload — use `/scrape` plus the worker/client path, or wire
 FSM state into the confirm handler (it should call
-`scrape_job_payload(url, mode)`); (2) production `main.py` photo
-delivery is not yet wired: the delivery helper returns a photo dict
-but no aiogram `send_photo` call exists in `main.py` yet, and (3)
+`scrape_job_payload(url, mode)`); (2) CLOSED for the single-process
+path: `workers/consumer.py` now calls `bot.send_photo` with the
+delivery helper's photo dict (the `/scrape` path and the worker/
+client path work; live Telegram was not tested in this VM), and (3)
 production ARQ results should prefer passing screenshots via
 temporary storage rather than as multi-MB job-result payloads (the
 worker dict currently carries the data URL for single-process dev).
+ARQ/Redis is still NOT wired for these jobs: the consumer above is
+the single-process deployment path, and a multi-worker deployment
+must replace it with a real ARQ consumer sharing a DB-backed key
+store (see the wiring-gap section below).
+
+## Premium /start + job consumer (live bug fixes, 2026-10-31)
+
+First live run showed four bugs, all fixed in code (not just
+documented), with fake-object tests in
+`tests/test_premium_start_and_consumer.py` (16 tests):
+
+1. **Literal `<b>` / `&lt;url&gt;` in chat** — /start and /help used
+   `message.answer()` without parse_mode. Fixed: `handlers/_common.py`
+   `send_html()` always passes `parse_mode="HTML"`, and every handler
+   sending HTML text uses it. Texts are valid HTML: user names/URLs
+   escaped, examples use `&lt;` WITH HTML mode (renders as `<`).
+2. **Dead inline buttons** — a nav/feature callback answered, then an
+   edit failure (or any exception) was swallowed, leaving the spinner
+   stuck. Fixed: `callback.answer()` FIRST in every callback handler,
+   the whole body in try/except that logs and sends a visible error
+   message, and `edit_or_send` falls back to a NEW message (`"sent"`)
+   when edit fails, raising/logging if that also fails. Router
+   `include_router` failures are now logged, not swallowed.
+   A second live cause was also found and fixed: start.py's bare-text
+   catch-all (`@router.message()` with no filter) swallowed commands
+   — `/scrape https://...` became a *search* job. It now excludes
+   commands (aiogram filter + early return), so commands reach their
+   own handlers. A third cause: nav context never carried `is_admin`,
+   so the Menu Admin button vanished after any navigation; it is now
+   filled from ADMIN_TELEGRAM_IDS.
+3. **Jobs stuck at "memproses..."** — handlers enqueued into
+   `workers/queue.py` InMemoryQueue and NOTHING popped it (ARQ was
+   never fed). Fixed: `workers/consumer.py` `consume_forever` runs in
+   the bot process (started by `main.py` `run_bot_polling` as an
+   asyncio task). It pops a job, sends a clear progress message
+   ("⏳ Mengerjakan \<kind\>: \<target\> — Job \<id\>…"), resolves
+   the Context.dev key from the bot process's admin KEY_STORE (env
+   fallback), runs `run_job_with_timeout`, then delivers a clear
+   result (title, excerpt, numbered sources, credits_consumed,
+   request_id, honest "sebagian" note when is_partial; photo via
+   `send_photo` for screenshots) or a clear failure message with the
+   exact reason and next step (key missing -> /admin, quota ->
+   Usage & Paket, timeout -> retry). A job never stays at memproses.
+   The accept message now says a progress message and a result
+   message will follow, with job id and what is being processed.
+4. **Premium /start** — `formatters.welcome_text(name, username)`
+   renders "Halo, {nama} 👋 / Selamat datang di OktaScrape" + a
+   one-line description + "Cara pakai" in 3 steps, with ── dividers
+   and a blockquote, HTML-escaped, and NO channel-join / forced-join
+   / verification-access content anywhere. `send_welcome()` sends a
+   banner photo + welcome caption (<=1024 chars) when an admin has
+   set one, otherwise the text card, always with the main menu.
+   Banner is a Telegram file_id set by an admin, never a binary or
+   downloaded image in code, with text fallback when none is set.
+
+**Admin banner/welcome settings** (admin-only, private chat for
+input): /admin now also has "Atur Sambutan", "Atur Banner",
+"Lihat Sambutan", "Hapus Banner", "Reset Sambutan" (v1 callbacks).
+Atur Sambutan: admin sends the next text (max 2000 chars,
+placeholders {nama}/{username}/{bot} kept, only <b>/<i>/<code>/
+<blockquote>/<a> survive, everything else escaped). Atur Banner:
+admin sends the next photo (largest size stored as file_id);
+confirmation is "Banner tersimpan" only — the file_id is never
+echoed in full. Lihat Sambutan renders the current template with a
+sample name. Reset restores the default and clears the banner.
+Store: `services/welcome_service.py` WelcomeStore (in-memory, same
+DB-backed gap as the key store: production main.py wiring must
+replace it, or a custom welcome/banner is lost on restart).
 
 ## Remaining wiring gap (admin-panel key, honest)
 The resolver and the client acceptance are implemented and tested:
