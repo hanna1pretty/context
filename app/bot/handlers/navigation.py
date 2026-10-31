@@ -14,8 +14,20 @@ edit when possible, new message on MessageNotModified / not-editable
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 
 from .._compat import get_router
+
+logger = logging.getLogger(__name__)
+
+
+def _is_admin_id(uid) -> bool:
+    try:
+        return str(uid) in {p.strip() for p in os.environ.get("ADMIN_TELEGRAM_IDS", "").split(",")
+                            if p.strip()}
+    except Exception:
+        return False
 from ..callbacks.navigation import NavState
 from ..formatters import messages as msg
 from ..keyboards import (
@@ -293,19 +305,29 @@ async def answer_callback(callback, text: str | None = None, show_alert: bool = 
 
 async def edit_or_send(target, text: str, reply_markup=None, parse_mode: str = "HTML") -> str:
     """Edit the target message when possible; otherwise send a new one.
-    Returns "edited" or "sent". Works with fake objects in tests."""
+    Returns "edited" or "sent". Works with fake objects in tests.
+
+    Failure path (this was a live bug): an edit failure used to fall
+    through silently. Now the fallback send is attempted, and if THAT
+    also fails the error is logged AND raised, so the bot log shows
+    it instead of the user staring at a dead button.
+    """
     message = getattr(target, "message", None) or target
     edit = getattr(message, "edit_text", None)
     if callable(edit):
         try:
             await _maybe_await(edit(text, reply_markup=reply_markup, parse_mode=parse_mode))
             return "edited"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("edit_text failed, falling back to a new message: %s", exc)
     answer = getattr(message, "answer", None)
     if callable(answer):
-        await _maybe_await(answer(text, reply_markup=reply_markup, parse_mode=parse_mode))
-        return "sent"
+        try:
+            await _maybe_await(answer(text, reply_markup=reply_markup, parse_mode=parse_mode))
+            return "sent"
+        except Exception as exc:
+            logger.exception("fallback message send failed: %s", exc)
+            raise RuntimeError("edit and fallback send both failed") from exc
     raise RuntimeError("target has neither edit_text nor answer")
 
 
@@ -318,6 +340,12 @@ async def render_screen(target, screen: str, context: dict | None = None,
     if user_id is None:
         user = getattr(target, "from_user", None)
         user_id = getattr(user, "id", None) if user is not None else None
+    # Preserve the admin button across navigation: the original context
+    # never carried is_admin, so every nav screen silently lost Menu
+    # Admin. Fill it from ADMIN_TELEGRAM_IDS when not explicitly set.
+    if context is None or "is_admin" not in context:
+        if user_id is not None and _is_admin_id(user_id):
+            c["is_admin"] = True
     if screen not in SCREENS:
         screen = "home"
     if user_id is not None:
@@ -363,14 +391,33 @@ def _user_id(callback, context: dict | None):
 
 @router.callback_query(_NAV_FILTER)
 async def on_nav_callback(callback):
+    # Answer FIRST so the spinner never sticks, then render. Any
+    # failure after the answer must still reach the user as a visible
+    # error message (and the bot log), never as a silent dead button.
     await answer_callback(callback)
-    data = getattr(callback, "data", "") or ""
-    parts = data.split(":")
-    if len(parts) >= 3 and parts[2] == "home":
-        await go_home(callback)
-    elif len(parts) >= 3 and parts[2] == "back":
-        await go_back(callback)
-    elif len(parts) >= 4 and parts[2] == "screen":
-        await render_screen(callback, parts[3])
-    else:
-        await go_home(callback)
+    try:
+        data = getattr(callback, "data", "") or ""
+        parts = data.split(":")
+        if len(parts) >= 3 and parts[2] == "home":
+            await go_home(callback)
+        elif len(parts) >= 3 and parts[2] == "back":
+            await go_back(callback)
+        elif len(parts) >= 4 and parts[2] == "screen":
+            await render_screen(callback, parts[3])
+        else:
+            await go_home(callback)
+    except Exception as exc:
+        logger.exception("nav callback failed for %r: %s", getattr(callback, "data", None), exc)
+        # A second answer() may fail in real Telegram (one answer per
+        # callback); answer_callback swallows that, the error message
+        # below is the visible response.
+        await answer_callback(callback, "Terjadi kesalahan, coba lagi.", show_alert=True)
+        try:
+            await edit_or_send(
+                callback,
+                "⚠️ <b>Terjadi kesalahan saat membuka layar ini.</b>\n"
+                "Silakan tekan Menu Utama atau kirim /start lagi.",
+                reply_markup=error_keyboard("validation", "home"))
+        except Exception:
+            logger.exception("nav error message also failed")
+            raise
