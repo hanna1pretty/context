@@ -53,12 +53,20 @@ def main_menu_text(language: str = "id") -> str:
 
 def scrape_menu_text(language: str = "id") -> str:
     if language == "en":
-        return ("<b>Scrape URL</b>\n\nFetch data from a single web page "
-                "using the output you choose.\n\n"
-                "<i>Send a URL after choosing a mode.</i>")
-    return ("<b>Scrape URL</b>\n\nAmbil data dari satu halaman web "
-            "menggunakan output yang kamu pilih.\n\n"
-            "<i>Kirim URL setelah memilih mode.</i>")
+        return ("<b>Scrape URL — apa ini?</b>\n\nFetch the content of ONE "
+                "web page: title, text, and links, via Context.dev.\n\n"
+                "<b>How to use:</b>\n1. Pick a mode below (Markdown/HTML/"
+                "Screenshot/JSON)\n2. Send the URL, or use "
+                "<code>/scrape https://example.com</code>\n\n"
+                "<i>Result comes as a new message with title, excerpt, "
+                "sources, and credits — no endless queue.</i>")
+    return ("<b>Scrape URL — ini apa?</b>\n\nMengambil isi SATU halaman "
+            "web: judul, teks, dan link-nya, lewat Context.dev.\n\n"
+            "<b>Cara pakai:</b>\n1. Pilih mode di bawah (Markdown/HTML/"
+            "Screenshot/JSON)\n2. Kirim URL-nya, atau pakai "
+            "<code>/scrape https://example.com</code>\n\n"
+            "<i>Hasilnya dikirim sebagai pesan baru: judul, cuplikan, "
+            "sumber, dan kredit — bukan antrean tanpa ujung.</i>")
 
 
 def scrape_confirm_text(url: str, mode: str, cache: str = "Default",
@@ -89,9 +97,12 @@ def search_menu_text(language: str = "id") -> str:
         return ("<b>Search Web</b>\n\nSearch web pages with a natural "
                 "language query.\n\n<b>Example:</b>\n"
                 "<code>/search latest AI developments in Indonesia</code>")
-    return ("<b>Search Web</b>\n\nCari halaman web berdasarkan query "
-            "natural language.\n\n<b>Contoh:</b>\n"
-            "<code>/search perkembangan AI di Indonesia</code>")
+    return ("<b>Search Web — ini apa?</b>\n\nMencari halaman web dari "
+            "pertanyaan bahasa sehari-hari, bukan kata kunci kaku.\n\n"
+            "<b>Cara pakai:</b> kirim pertanyaanmu, atau pakai\n"
+            "<code>/search perkembangan AI di Indonesia</code>\n\n"
+            "<b>Hasilnya:</b> daftar halaman + cuplikan + sumber, "
+            "bisa dibuka satu per satu dari tombolnya.")
 
 
 def search_results_text(query: str, page: int, total_pages: int,
@@ -121,9 +132,13 @@ def crawl_menu_text(language: str = "id") -> str:
         return ("<b>Crawl Website</b>\n\nFollow links from a start URL and "
                 "fetch several pages asynchronously.\n\n"
                 "<i>Page count, depth, and cost follow your plan and API limits.</i>")
-    return ("<b>Crawl Website</b>\n\nIkuti link dari URL awal dan ambil "
-            "konten beberapa halaman secara asynchronous.\n\n"
-            "<i>Jumlah halaman, depth, dan biaya mengikuti paket serta limit API.</i>")
+    return ("<b>Crawl Website — ini apa?</b>\n\nMerayapi sebuah website: "
+            "mulai dari satu URL, lalu mengikuti link-nya dan mengambil "
+            "konten banyak halaman sekaligus.\n\n"
+            "<b>Cara pakai:</b> <code>/crawl https://example.com</code>\n"
+            "Jumlah halaman dan depth mengikuti paket dan limit API.\n\n"
+            "<b>Hasilnya:</b> kumpulan halaman yang berhasil dirayapi, "
+            "bukan satu halaman saja.")
 
 
 def crawl_confirm_text(url: str, max_pages: int, depth: int,
@@ -145,8 +160,11 @@ def map_menu_text(language: str = "id") -> str:
     if language == "en":
         return ("<b>Map URLs</b>\n\nList the URLs on a domain, with filters "
                 "and export. Export requires a plan that allows it.")
-    return ("<b>Map URLs</b>\n\nDaftar URL pada sebuah domain, dengan filter "
-            "dan export. Export memerlukan paket yang mengizinkannya.")
+    return ("<b>Map URLs — ini apa?</b>\n\nMemetakan sebuah domain: "
+            "menampilkan daftar semua URL yang ada di website itu.\n\n"
+            "<b>Cara pakai:</b> <code>/map https://example.com</code>\n\n"
+            "<b>Hasilnya:</b> daftar URL yang bisa dijelajahi. Export "
+            "memerlukan paket yang mengizinkannya.")
 
 
 def map_results_text(domain: str, page: int, total_pages: int,
@@ -163,8 +181,10 @@ def answers_menu_text(language: str = "id") -> str:
                 "returns an answer and source URLs when available.\n\n"
                 "<i>For important decisions, verify the answer against the "
                 "original sources.</i>")
-    return ("<b>Ask / Answers</b>\n\nAjukan pertanyaan riset. Bot akan "
-            "mengembalikan jawaban dan URL sumber bila tersedia.\n\n"
+    return ("<b>Ask / Answers — ini apa?</b>\n\nBertanya seperti ke "
+            "asisten riset: bot menjawab dari isi web, lengkap dengan "
+            "URL sumbernya bila tersedia.\n\n"
+            "<b>Cara pakai:</b> <code>/ask apa itu Context.dev?</code>\n\n"
             "<i>Untuk keputusan penting, verifikasi jawaban pada sumber asli.</i>")
 
 
@@ -187,9 +207,12 @@ def parse_menu_text(language: str = "id") -> str:
         return ("<b>Parse File</b>\n\nSend a PDF, document, spreadsheet, "
                 "presentation, image, or file URL in a supported format.\n\n"
                 "<i>Files are processed securely and kept for a limited time.</i>")
-    return ("<b>Parse File</b>\n\nKirim PDF, dokumen, spreadsheet, presentasi, "
-            "gambar, atau URL file sesuai format yang didukung.\n\n"
-            "<i>File akan diproses secara aman dan memiliki masa simpan terbatas.</i>")
+    return ("<b>Parse File — ini apa?</b>\n\nMengubah file menjadi teks "
+            "yang bisa dibaca dan dicari: PDF, dokumen, spreadsheet, "
+            "presentasi, gambar, atau URL file.\n\n"
+            "<b>Cara pakai:</b> kirim file-nya langsung ke chat ini, atau "
+            "<code>/parse https://example.com/file.pdf</code>\n\n"
+            "<i>File diproses secara aman dan hanya disimpan sementara.</i>")
 
 
 def parse_file_text(filename: str, size_bytes: int | None, mime: str | None,
@@ -209,9 +232,13 @@ def intelligence_menu_text(language: str = "id") -> str:
         return ("<b>Intelligence</b>\n\nBrand, styleguide, people, and "
                 "company lookups. People search/enrichment is only for "
                 "legitimate use cases.")
-    return ("<b>Intelligence</b>\n\nPencarian brand, styleguide, orang, "
-            "dan perusahaan. People search/enrichment hanya untuk "
-            "use case yang sah.")
+    return ("<b>Brand Intel — ini apa?</b>\n\nMencari informasi tentang "
+            "sebuah brand atau perusahaan: profil, website, dan gaya "
+            "visualnya (styleguide).\n\n"
+            "<b>Cara pakai:</b> <code>/brand nama-brand</code> atau "
+            "<code>/company nama-perusahaan</code>, lalu pilih Brand "
+            "Lookup / Brand Search / Styleguide di bawah.\n\n"
+            "People search/enrichment hanya untuk keperluan yang sah.")
 
 
 def people_warning_text(language: str = "id") -> str:
@@ -230,6 +257,71 @@ def _field_lines(fields: dict, language: str = "id") -> str:
     return "\n".join(
         f"<b>{escape_html(key)}:</b> {_or_empty(value, language)}"
         for key, value in fields.items())
+
+
+def brand_menu_text(language: str = "id") -> str:
+    if language == "en":
+        return ("<b>Brand — what is it?</b>\n\nLook up a brand: profile, "
+                "website, and styleguide.\n\n<b>How to use:</b> "
+                "<code>/brand brand-name</code>, then pick Brand Lookup, "
+                "Brand Search, or Styleguide below.")
+    return ("<b>Brand — ini apa?</b>\n\nMencari profil sebuah brand: "
+            "website, deskripsi, dan styleguide-nya.\n\n"
+            "<b>Cara pakai:</b> <code>/brand nama-brand</code>, lalu "
+            "pilih Brand Lookup, Brand Search, atau Styleguide di bawah.")
+
+
+def people_menu_text(language: str = "id") -> str:
+    if language == "en":
+        return ("<b>People — what is it?</b>\n\nSearch or enrich a "
+                "person's public professional profile.\n\n"
+                "<b>How to use:</b> <code>/people full-name</code>, then "
+                "pick People Search or People Enrich below.\n\n"
+                "<i>Only for legitimate purposes.</i>")
+    return ("<b>People — ini apa?</b>\n\nMencari atau melengkapi profil "
+            "profesional publik seseorang.\n\n"
+            "<b>Cara pakai:</b> <code>/people nama-lengkap</code>, lalu "
+            "pilih People Search atau People Enrich di bawah.\n\n"
+            "<i>Hanya untuk keperluan yang sah.</i>")
+
+
+def company_menu_text(language: str = "id") -> str:
+    if language == "en":
+        return ("<b>Company — what is it?</b>\n\nLook up a company: "
+                "profile, website, and related info.\n\n"
+                "<b>How to use:</b> <code>/company company-name</code>, "
+                "then pick Company Search below.")
+    return ("<b>Perusahaan — ini apa?</b>\n\nMencari profil sebuah "
+            "perusahaan: website dan info terkaitnya.\n\n"
+            "<b>Cara pakai:</b> <code>/company nama-perusahaan</code>, "
+            "lalu pilih Company Search di bawah.")
+
+
+def batches_menu_text(language: str = "id") -> str:
+    if language == "en":
+        return ("<b>Batches — what is it?</b>\n\nRun many URLs at once "
+                "as one batch instead of one by one.\n\n"
+                "<b>How to use:</b> "
+                "<code>/batch https://a.com,https://b.com</code>\n\n"
+                "Job Center below shows every batch and job status.")
+    return ("<b>Batches — ini apa?</b>\n\nMenjalankan banyak URL "
+            "sekaligus dalam satu batch, bukan satu per satu.\n\n"
+            "<b>Cara pakai:</b> "
+            "<code>/batch https://a.com,https://b.com</code>\n\n"
+            "Job Center di bawah menampilkan status semua batch dan job.")
+
+
+def monitors_menu_text(language: str = "id") -> str:
+    if language == "en":
+        return ("<b>Monitors — what is it?</b>\n\nWatch a URL and get "
+                "notified when its content changes.\n\n"
+                "<b>How to use:</b> <code>/monitor https://example.com</code> "
+                "to create one, or <code>/monitor list</code> to see yours.")
+    return ("<b>Monitors — ini apa?</b>\n\nMemantau sebuah URL dan "
+            "memberi kabar saat isinya berubah.\n\n"
+            "<b>Cara pakai:</b> <code>/monitor https://example.com</code> "
+            "untuk membuat monitor, atau <code>/monitor list</code> "
+            "untuk melihat monitor kamu.")
 
 
 def brand_text(fields: dict, language: str = "id") -> str:
@@ -251,7 +343,10 @@ def company_text(fields: dict, language: str = "id") -> str:
 def news_menu_text(language: str = "id") -> str:
     if language == "en":
         return "<b>News</b>\n\nSearch news, follow company news, and save queries."
-    return "<b>News</b>\n\nCari berita, ikuti berita perusahaan, dan simpan query."
+    return ("<b>News — ini apa?</b>\n\nMencari berita terbaru tentang "
+            "topik atau perusahaan, dan menyimpan query-nya.\n\n"
+            "<b>Cara pakai:</b> <code>/news nama-perusahaan</code> atau "
+            "kirim topik beritanya.")
 
 
 def job_center_text(language: str = "id") -> str:
@@ -316,7 +411,10 @@ def locked_feature_text(feature: str, required_plan: str, language: str = "id") 
 def settings_menu_text(language: str = "id") -> str:
     if language == "en":
         return "<b>Settings</b>\n\nLanguage, timezone, notifications, default output, and data controls."
-    return "<b>Pengaturan</b>\n\nBahasa, timezone, notifikasi, output default, dan kontrol data."
+    return ("<b>Pengaturan — ini apa?</b>\n\nMengatur bot untuk kamu: "
+            "bahasa, timezone, notifikasi, output default, dan kontrol "
+            "data (hapus history / hapus data saya).\n\n"
+            "<b>Cara pakai:</b> pilih salah satu tombol di bawah.")
 
 
 def settings_delete_text(language: str = "id") -> str:
