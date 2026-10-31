@@ -27,5 +27,20 @@ async def accept(message, kind: str, payload: dict) -> str:
     it no longer leaves the user at a bare "memproses..." state.
     """
     result = await enqueue_job(kind, message.from_user.id, payload)
+    if result.get("duplicate"):
+        # Never lie that a duplicate is a new queued job: the original
+        # job is the one that will deliver a result, and this request
+        # created nothing. Saying "Antrian diterima" here was exactly
+        # how a repeat /scrape stayed at "mengantre" forever.
+        await send_html(
+            message,
+            "⏳ <b>Job yang sama sudah berjalan</b>\n"
+            f"Job: <code>{result['job_id']}</code>\n"
+            "Permintaan yang sama sudah mengantre / diproses, jadi "
+            "tidak dibuat duplikat. Hasilnya akan dikirim dari job itu. "
+            "Kalau job itu sudah lama tanpa hasil, kirim lagi setelah "
+            "hasilnya muncul, atau hubungi admin.",
+        )
+        return result["job_id"]
     await send_html(message, accepted_message(result["job_id"], kind, payload=payload))
     return result["job_id"]
