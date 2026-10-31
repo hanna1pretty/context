@@ -52,7 +52,8 @@ _NAMESPACE_ACTIONS: dict[str, set[str]] = {
                  "clear_history", "confirm_clear", "delete_data",
                  "confirm_delete", "privacy", "set_language",
                  "set_timezone", "set_output", "toggle_notifications"},
-    "admin": {"dashboard", "health", "stats"},
+    "admin": {"dashboard", "health", "stats", "welcome_set", "welcome_show",
+              "welcome_reset", "welcome_cancel", "banner_set", "banner_delete"},
 }
 
 # Deliberate backward-compat deviation: these pre-v1 callbacks are wired
