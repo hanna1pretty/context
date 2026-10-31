@@ -20,6 +20,7 @@ belong to handlers/admin.py, which is included BEFORE this router.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from .._compat import get_router
@@ -186,6 +187,21 @@ def process_callback(data: str | None, *, user_id: int,
                 return {"status": "invalid", "data": data}
             if idx < 1 or idx > search_result_count:
                 return {"status": "not_found", "index": idx}
+    # Mode/help/options buttons used to re-render the same screen with
+    # no visible change, which users read as "tombol tidak bisa diklik".
+    # Return a notice so the wrapper sends a real message explaining
+    # what just happened and what to do next.
+    if parsed.namespace == "scrape" and parsed.action == "mode":
+        mode = parsed.first_arg or "markdown"
+        return {"status": "ok", "screen": "scrape",
+                "notice": (f"Mode <b>{mode}</b> dipilih. Sekarang kirim URL "
+                           "yang mau di-scrape, atau pakai "
+                           f"<code>/scrape https://example.com</code>.")}
+    if parsed.namespace == "scrape" and parsed.action in {"help", "options", "browser"}:
+        return {"status": "ok", "screen": "scrape",
+                "notice": ("<b>Scrape URL</b> mengambil isi satu halaman web. "
+                           "Pilih mode di atas, lalu kirim URL-nya, atau pakai "
+                           "<code>/scrape https://example.com</code>.")}
     # Double-click + enqueue for job-creating actions.
     kind = _ENQUEUE_ACTIONS.get((parsed.namespace, parsed.action))
     if kind is not None:
@@ -282,6 +298,18 @@ async def _handle_callback_inner(callback, *, context: dict | None = None) -> di
         outcome["job_id"] = result["job_id"]
         outcome["enqueued"] = True
     await render_screen(callback, outcome.get("screen", "home"), ctx)
+    if outcome.get("notice"):
+        # Best-effort visible feedback: the screen re-render alone is
+        # invisible when the screen did not change.
+        try:
+            message = getattr(callback, "message", None)
+            answer = getattr(message, "answer", None) if message is not None else None
+            if callable(answer):
+                sent = answer(outcome["notice"], parse_mode="HTML")
+                if asyncio.iscoroutine(sent):
+                    await sent
+        except Exception:
+            logger.exception("notice message failed")
     return outcome
 
 
