@@ -135,27 +135,29 @@ def _screen_text(screen: str, c: dict) -> str:
     if screen == "intelligence":
         return msg.intelligence_menu_text(lang)
     if screen == "brand":
-        return msg.brand_text(c.get("fields", {}), lang)
+        # Empty fields used to render a bare "<b>Brand</b>" title with
+        # nothing under it — exactly the "tidak ada dalemnya" users
+        # reported. Show the explanation instead until a lookup fills it.
+        return msg.brand_text(c.get("fields", {}), lang) if c.get("fields") else msg.brand_menu_text(lang)
     if screen == "styleguide":
-        return msg.brand_text(c.get("fields", {}), lang)
+        return msg.brand_text(c.get("fields", {}), lang) if c.get("fields") else msg.brand_menu_text(lang)
     if screen == "people":
-        return msg.people_text(c.get("fields", {}), lang)
+        return msg.people_text(c.get("fields", {}), lang) if c.get("fields") else msg.people_menu_text(lang)
     if screen == "company":
-        return msg.company_text(c.get("fields", {}), lang)
+        return msg.company_text(c.get("fields", {}), lang) if c.get("fields") else msg.company_menu_text(lang)
     if screen == "news":
         return msg.news_menu_text(lang)
     if screen == "news_results":
         return msg.search_results_text(c.get("query", ""), c["page"],
                                        c["total_pages"], c.get("results", []), lang)
     if screen == "batches":
-        return msg.job_center_text(lang)
+        return msg.batches_menu_text(lang)
     if screen == "job_center":
         return msg.job_center_text(lang)
     if screen == "job_detail":
         return msg.job_text(c.get("job", {}), lang)
     if screen == "monitors":
-        return "<b>Monitors</b>\n\n" + ("Kelola monitor kamu di bawah."
-                                        if lang == "id" else "Manage your monitors below.")
+        return msg.monitors_menu_text(lang)
     if screen == "monitor_detail":
         return msg.job_text(c.get("job", {"job_id": c.get("monitor_id", "")}), lang)
     if screen == "monitor_delete_confirm":
@@ -313,6 +315,20 @@ async def edit_or_send(target, text: str, reply_markup=None, parse_mode: str = "
     it instead of the user staring at a dead button.
     """
     message = getattr(target, "message", None) or target
+    # Photo welcome first: a photo message has a caption, not text.
+    # edit_text on it fails in real Telegram, which used to look like
+    # a dead button (or a screen that never appeared) when the user
+    # tapped a main-menu button on the banner welcome. Edit the
+    # caption instead; only fall back to a new message if that fails.
+    if getattr(message, "photo", None):
+        edit_caption = getattr(message, "edit_caption", None)
+        if callable(edit_caption):
+            try:
+                await _maybe_await(edit_caption(caption=text, reply_markup=reply_markup,
+                                                parse_mode=parse_mode))
+                return "edited_caption"
+            except Exception as exc:
+                logger.exception("edit_caption failed, falling back to a new message: %s", exc)
     edit = getattr(message, "edit_text", None)
     if callable(edit):
         try:
