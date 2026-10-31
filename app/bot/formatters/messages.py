@@ -334,9 +334,32 @@ def settings_clear_text(language: str = "id") -> str:
 
 
 def help_text(language: str = "id") -> str:
+    """Premium help screen (inline-first). This is what /help now sends:
+    a short guide + inline topics, NOT a raw command dump. The full
+    command list lives behind the 'Semua Command' button only."""
     if language == "en":
-        return "<b>Help</b>\n\nPick a topic below, or send /help for the full command list."
-    return "<b>Bantuan</b>\n\nPilih topik di bawah, atau kirim /help untuk daftar command lengkap."
+        return (
+            "<b>Help — OktaScrape</b>\n\n"
+            "<blockquote>Read, search, crawl, extract, and monitor the "
+            "web with Context.dev — from the buttons below.</blockquote>\n\n"
+            "<b>How to use:</b>\n"
+            "1. Pick a menu below\n"
+            "2. Send a URL to scrape or crawl\n"
+            "3. Or send a question directly\n\n"
+            "Commands like /scrape are shortcuts; the buttons are the "
+            "primary way to use the bot. Pick a topic below."
+        )
+    return (
+        "<b>Bantuan — OktaScrape</b>\n\n"
+        "<blockquote>Baca, cari, rayapi, ekstrak, dan pantau informasi "
+        "dari web lewat Context.dev — lewat tombol di bawah.</blockquote>\n\n"
+        "<b>Cara pakai:</b>\n"
+        "1. Pilih menu di bawah\n"
+        "2. Kirim URL untuk di-scrape / di-crawl\n"
+        "3. Atau kirim pertanyaan langsung\n\n"
+        "Command seperti /scrape hanya jalan pintas; tombol inline "
+        "adalah cara utama memakai bot. Pilih topik di bawah."
+    )
 
 
 def help_commands_text(language: str = "id") -> str:
