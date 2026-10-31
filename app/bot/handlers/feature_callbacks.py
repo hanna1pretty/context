@@ -20,7 +20,11 @@ belong to handlers/admin.py, which is included BEFORE this router.
 """
 from __future__ import annotations
 
+import logging
+
 from .._compat import get_router
+
+logger = logging.getLogger(__name__)
 from ..callbacks.base import (
     DoubleClickGuard,
     check_owner,
@@ -203,8 +207,28 @@ def process_callback(data: str | None, *, user_id: int,
 
 
 async def handle_callback(callback, *, context: dict | None = None) -> dict:
-    """aiogram-facing wrapper: answer first, run the core, render."""
+    """aiogram-facing wrapper: answer first, run the core, render.
+
+    Any failure after the answer is surfaced as a visible error
+    screen (and logged), never swallowed into a dead button.
+    """
     await answer_callback(callback)
+    try:
+        return await _handle_callback_inner(callback, context=context)
+    except Exception as exc:
+        logger.exception("feature callback failed for %r: %s",
+                         getattr(callback, "data", None), exc)
+        await answer_callback(callback, "Terjadi kesalahan, coba lagi.", show_alert=True)
+        try:
+            await show_error(callback, msg.error_validation_text(
+                (context or {}).get("language", "id")), kind="validation")
+        except Exception:
+            logger.exception("feature error message also failed")
+            raise
+        return {"status": "error", "reason": str(exc)}
+
+
+async def _handle_callback_inner(callback, *, context: dict | None = None) -> dict:
     ctx = dict(context or {})
     user = getattr(callback, "from_user", None)
     user_id = getattr(user, "id", None)
