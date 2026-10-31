@@ -22,7 +22,12 @@ from .account import (
     settings_menu,
     usage_keyboard,
 )
-from .admin import admin_cancel_keyboard, admin_dashboard_keyboard, admin_menu
+from .admin import (
+    admin_cancel_keyboard,
+    admin_dashboard_keyboard,
+    admin_menu,
+    admin_welcome_cancel_keyboard,
+)
 from .answers import answers_menu, answers_result_keyboard
 from .batches import (
     batch_actions,
@@ -86,5 +91,5 @@ __all__ = [
     "usage_keyboard", "plan_keyboard", "locked_feature_keyboard",
     "settings_menu", "settings_language_keyboard",
     "settings_clear_confirm_keyboard", "settings_delete_confirm_keyboard",
-    "help_menu", "admin_dashboard_keyboard",
+    "help_menu", "admin_dashboard_keyboard", "admin_welcome_cancel_keyboard",
 ]
