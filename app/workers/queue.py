@@ -17,7 +17,12 @@ MAX_QUEUE = 10000
 class InMemoryQueue:
     def __init__(self):
         self._q: deque = deque()
-        self._seen_idempotency: set[str] = set()
+        # In-flight only, NOT forever: a key is released when its job
+        # is popped for execution. The old code kept every key forever
+        # and returned a fake "dup-..." job id for a repeat request,
+        # while accept() still told the user "Antrian diterima" — so a
+        # second /scrape of the same URL could never produce a result.
+        self._inflight: dict[str, str] = {}
 
     def enqueue(self, kind: str, user_id: int, payload: dict,
                 *, idempotency_key: str | None = None) -> dict:
@@ -25,17 +30,22 @@ class InMemoryQueue:
             raise RuntimeError("queue is full")
         key = idempotency_key or hashlib.sha256(
             f"{user_id}:{kind}:{payload}".encode()).hexdigest()[:32]
-        if key in self._seen_idempotency:
-            return {"job_id": f"dup-{key[:12]}", "duplicate": True}
-        self._seen_idempotency.add(key)
+        if key in self._inflight:
+            return {"job_id": self._inflight[key], "duplicate": True}
         job_id = uuid.uuid4().hex[:12]
+        self._inflight[key] = job_id
         job = {"job_id": job_id, "kind": kind, "user_id": user_id,
-               "payload": payload, "status": "queued"}
+               "payload": payload, "status": "queued",
+               "_idempotency_key": key}
         self._q.append(job)
         return {"job_id": job_id, "duplicate": False}
 
     def pop(self):
-        return self._q.popleft() if self._q else None
+        if not self._q:
+            return None
+        job = self._q.popleft()
+        self._inflight.pop(job.get("_idempotency_key"), None)
+        return job
 
     def depth(self) -> int:
         return len(self._q)
