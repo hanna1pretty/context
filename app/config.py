@@ -36,6 +36,7 @@ class Settings:
     app_name: str = "context-intelligence-bot"
     log_level: str = "INFO"
     telegram_bot_token: str = ""
+    bot_display_name: str = "OktaScrape"
     telegram_webhook_secret: str = ""
     telegram_api_id: str = ""  # only for MTProto; Bot API does NOT need it
     telegram_api_hash: str = ""
@@ -80,6 +81,7 @@ def load_settings() -> Settings:
         app_env=os.environ.get("APP_ENV", "development"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+        bot_display_name=os.environ.get("BOT_DISPLAY_NAME", "OktaScrape") or "OktaScrape",
         telegram_webhook_secret=os.environ.get("TELEGRAM_WEBHOOK_SECRET", ""),
         telegram_api_id=os.environ.get("TELEGRAM_API_ID", ""),
         telegram_api_hash=os.environ.get("TELEGRAM_API_HASH", ""),
