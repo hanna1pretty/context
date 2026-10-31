@@ -20,3 +20,27 @@ def admin_health() -> str:
 
 def admin_stats() -> str:
     return build("admin", "stats")
+
+
+def admin_welcome_set() -> str:
+    return build("admin", "welcome_set")
+
+
+def admin_welcome_show() -> str:
+    return build("admin", "welcome_show")
+
+
+def admin_welcome_reset() -> str:
+    return build("admin", "welcome_reset")
+
+
+def admin_welcome_cancel() -> str:
+    return build("admin", "welcome_cancel")
+
+
+def admin_banner_set() -> str:
+    return build("admin", "banner_set")
+
+
+def admin_banner_delete() -> str:
+    return build("admin", "banner_delete")
