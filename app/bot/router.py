@@ -1,6 +1,10 @@
 """Assemble all handler routers."""
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from .handlers import (
     account, admin, answers, batches, crawl, feature_callbacks,
     intelligence, map, monitors, navigation, parse, scrape, search, start,
@@ -19,4 +23,7 @@ for mod in (admin, start, scrape, search, crawl, map, answers, parse, intelligen
     try:
         router.include_router(mod.router)
     except Exception:
-        pass
+        # Never swallow router wiring silently: a failed include used
+        # to look exactly like a dead button in production. Log it and
+        # keep including the rest so one bad module cannot kill the bot.
+        logger.exception("Failed to include router %s", getattr(mod, "__name__", mod))
