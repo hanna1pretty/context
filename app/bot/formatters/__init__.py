@@ -61,6 +61,66 @@ def welcome(language: str = "id") -> str:
     return WELCOME_ID if language == "id" else WELCOME_EN
 
 
+# --- Premium /start welcome (OktaScrape, no channel-join content) ---
+import html as _html
+import re as _re
+
+DEFAULT_WELCOME_TEMPLATE = (
+    "Halo, {nama} 👋\n"
+    "Selamat datang di {bot}\n\n"
+    "<blockquote><b>{bot}</b> membantumu membaca, mencari, merayapi, "
+    "mengekstrak, dan memantau informasi dari web lewat Context.dev.</blockquote>\n\n"
+    "────────────────────\n"
+    "<b>Cara pakai:</b>\n"
+    "1. Pilih menu di bawah\n"
+    "2. Kirim URL untuk di-scrape / di-crawl\n"
+    "3. Atau kirim pertanyaan langsung\n\n"
+    "Pilih fitur di bawah untuk mulai ✨"
+)
+
+_ALLOWED_TAGS = ("b", "i", "code", "blockquote", "u")
+
+
+def _sanitize_template(template: str, name: str, username: str,
+                       display_name: str) -> str:
+    """Render a template safely: placeholders are escaped values, and
+    only a small tag set survives. Every other tag is dropped (its
+    inner text stays), so an admin template can never inject a
+    script-like tag or a raw secret into chat."""
+    display = (name or "").strip() or (username or "").strip() or "kamu"
+    user_display = ("@" + username.strip()) if username and username.strip() else display
+    text = _html.escape(template)
+    text = text.replace("{nama}", escape_html(display))
+    text = text.replace("{username}", escape_html(user_display))
+    text = text.replace("{bot}", escape_html(display_name))
+    for tag in _ALLOWED_TAGS:
+        text = text.replace(f"&lt;{tag}&gt;", f"<{tag}>")
+        text = text.replace(f"&lt;/{tag}&gt;", f"</{tag}>")
+    text = _re.sub(r'&lt;a href=&quot;(https?://[^&"\s]+)&quot;&gt;',
+                   r'<a href="\1">', text)
+    text = text.replace("&lt;/a&gt;", "</a>")
+    return text
+
+
+def welcome_text(name: str = "", username: str = "", *,
+                 display_name: str = "OktaScrape", template: str | None = None,
+                 language: str = "id") -> str:
+    """Premium welcome text. ``template`` may use {nama}, {username},
+    {bot}; when None, the default OktaScrape template is used."""
+    return _sanitize_template(template if template is not None else DEFAULT_WELCOME_TEMPLATE,
+                              name, username, display_name)
+
+
+def truncate_caption(text: str, limit: int = 1024) -> str:
+    """Truncate a Telegram photo caption without leaving a dangling tag."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit - 1].rstrip()
+    if cut.count("<") > cut.count(">"):
+        cut = cut[:cut.rfind("<")].rstrip()
+    return cut + "…" if cut else text[:limit - 1] + "…"
+
+
 def format_search_results(items: list[dict]) -> list[str]:
     lines = []
     for i, it in enumerate(items, 1):
@@ -93,7 +153,8 @@ def format_normalized(kind: str, result, *, language: str = "id") -> list[str]:
 
 
 __all__ = [
-    "WELCOME_ID", "WELCOME_EN", "welcome", "format_search_results",
+    "WELCOME_ID", "WELCOME_EN", "welcome", "welcome_text",
+    "DEFAULT_WELCOME_TEMPLATE", "truncate_caption", "format_search_results",
     "format_normalized", "escape_html", "split_message", "bold", "code",
     "italic", "link", "pre", "quote", "redact_secrets", "safe_url",
     "split_html_message", "truncate_for_telegram", "underline",
