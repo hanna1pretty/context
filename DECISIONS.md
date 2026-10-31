@@ -126,3 +126,62 @@
   Likewise, `main.py` has no aiogram `send_photo` call yet, so the
   delivery helper's photo dict is not yet consumed by production
   Telegram code (live Telegram was not tested in this VM anyway).
+
+- **Live bug fixes + premium /start (2026-10-31, after first live run)**:
+  - **parse_mode**: `handlers/_common.py::send_html` is now the single
+    HTML send site (always `parse_mode="HTML"`); /start, /help, admin
+    welcome previews, and all HTML-text sends use it. Audit result:
+    admin service texts and the small command handlers send plain
+    text (no HTML tags), so they intentionally keep plain answers;
+    every send containing `<b>`/`<code>`/`<a>` now goes through
+    send_html or `edit_or_send` (which already set HTML).
+  - **Dead buttons**: `callback.answer()` first, whole handler body
+    in logged try/except with a visible error message, `edit_or_send`
+    falls back to a new message and raises/logs if that also fails,
+    router include failures are logged (not `except: pass`). Root
+    causes found beyond the silent-failure path: (a) start.py's bare
+    catch-all swallowed commands (a `/scrape` message became a search
+    job — now excluded by filter + early return); (b) nav context
+    never carried `is_admin`, so Menu Admin vanished after any
+    navigation (now filled from ADMIN_TELEGRAM_IDS).
+  - **Job execution**: `workers/consumer.py` (`consume_one` /
+    `consume_forever`) is the single-process consumer started by
+    `main.py::run_bot_polling` as an asyncio task. It resolves the
+    key from the bot process's admin KEY_STORE (env fallback) — this
+    works precisely because it shares the bot process; a separate
+    worker process would NOT see the in-memory store. Progress ->
+    result/failure delivery via `bot.send_message` (+ `send_photo`
+    for screenshots) is now the production path for the docker-compose
+    `bot` service; ARQ/Redis remains an unwired future gap and must
+    not be claimed as running these jobs.
+  - **Premium /start (OktaScrape, no channel-join content)**:
+    `formatters.welcome_text` (escaped name/username, {nama}/
+    {username}/{bot} placeholders, safe tag set only) + `start.py::
+    send_welcome` (banner photo + caption <=1024 chars, else text
+    card, always main menu). `BOT_DISPLAY_NAME` env (default
+    OktaScrape) controls the in-message name only; the BotFather
+    display name (Kaguya in live screenshots) is changed in
+    BotFather, not by this code.
+  - **Admin welcome/banner**: `services/welcome_service.py`
+    WelcomeStore (in-memory, same DB gap as the key store) +
+    WelcomeInputState; admin menu gains Atur/Lihat/Reset Sambutan
+    and Atur/Hapus Banner (v1 callbacks `admin:v1:welcome_*` /
+    `banner_*`, admin-only, private chat for input). Template max
+    2000 chars; banner confirmation never echoes the file_id.
+  - **/help**: now the inline Bantuan screen (`help_text` +
+    `help_menu`, HTML mode); the raw command dump lives only behind
+    the "Semua Command" button. Command handlers (/scrape etc.) are
+    kept as the working test path, with clear accept/progress wording.
+  - **Tests**: `tests/test_premium_start_and_consumer.py`, 16 tests
+    (welcome escaping/placeholders, caption cap, send_welcome text +
+    photo paths, edit fallback, nav answer-first on edit failure,
+    every main-menu/help screen renders with HTML mode, on_text
+    command exclusion, consumer result / missing-key failure /
+    screenshot photo, admin welcome+ banner flows incl. non-admin
+    refusal). Full suite after this change: 109 passed.
+  - **Still open after this change**: ARQ Redis consumer; DB-backed
+    welcome/key stores (both in-memory, lost on restart, not shared
+    between workers); live Telegram test still needed (VM has no
+    aiogram/Postgres/Redis, so all of the above is fake-object
+    verified only); screenshot menu confirm-flow gap (unchanged);
+    DoubleClickGuard/CursorStore/NavState still in-memory.
